@@ -25,13 +25,14 @@ function Thesis_Code_Final()
     G = ask_user('Soil Shear Modulus G (Pa)', 55e6);
     nu = ask_user('Soil Poisson ratio nu', 0.325);
     rho_s = ask_user('Soil Density rho_s (kg/m^3)', 1900);
+    Ks_MN = ask_user('Soil Subgrade Reaction Ks (MN/m^3)', 70);
     
     B = ask_user('Footing Width B (m)', 4.0);
     L = ask_user('Footing Length L (m)', 4.5);
     D_emb = ask_user('Embedment Depth Df (m)', 0.6);
     
     disp('--- SAP2000 Modal Results ---');
-    T_sap = ask_user('Period from SAP2000 (s)', 0.145);
+    T_sap = ask_user('Period from SAP2000 (s)', 0.1706);
 
     %% 2. CALCULATIONS 
     if B > L
@@ -52,7 +53,26 @@ function Thesis_Code_Final()
 
     a0 = omega_fixed * (B/2) / Vs;
 
-    % NIST Impedances (Analytical Theory)
+    % --- Auxiliary Spring Constants ---
+    Bp = 0.305;
+    Ks_kN = Ks_MN * 1000; 
+    n_delta = ((B + Bp) / (2 * B))^2;
+    n_sigmax = (1/3) * (2 + B / L);
+    n_beta = 1 + 2 * (D_emb / B);
+    Ks_tel_kN = n_delta * n_sigmax * n_beta * Ks_kN; 
+
+    Kz_dynamic_kN = Ks_tel_kN * B * L; 
+    Krb_static_kN = Ks_tel_kN * B * L^3 / 12; 
+    Krl_static_kN = Ks_tel_kN * L * B^3 / 12; 
+    Kx_dynamic_kN = 0.30 * Kz_dynamic_kN; 
+
+    krl_dyn = max(0.25, 1 - 0.15 * a0);
+    krb_dyn = max(0.25, 1 - 0.20 * a0); 
+    
+    Krl_dynamic_kN = Krl_static_kN * krl_dyn; 
+    Krb_dynamic_kN = Krb_static_kN * krb_dyn;
+
+    % --- NIST Impedances (Analytical Theory - Used for SSI) ---
     [K_dyn, beta_rad] = gazetas_impedance_full(B, L, D_emb, G, nu, Vs, omega_fixed);
     Kx_nist_N = K_dyn.x;
     Kyy_nist_N = K_dyn.ry;   
@@ -103,9 +123,15 @@ function Thesis_Code_Final()
     fprintf('omega_fixed          = %.4f rad/s\n', omega_fixed);
     fprintf('Delta_fixed          = %e m\n\n', Delta_fixed);
 
-    disp('--- Foundation spring constants (NIST/Gazetas) ---');
-    fprintf('Kx_dynamic           = %.3f kN/m\n', Kx_nist_kN);
-    fprintf('Kyy_dynamic          = %.3f kN*m/rad\n\n', Kyy_nist_kN);
+    disp('--- Foundation spring constants ---');
+    fprintf('Kx_dynamic           = %.3f kN/m\n', Kx_dynamic_kN);
+    fprintf('Kz_dynamic           = %.3f kN/m\n', Kz_dynamic_kN);
+    fprintf('Krl_dynamic          = %.3f kN*m/rad\n', Krl_dynamic_kN);
+    fprintf('Krb_dynamic          = %.3f kN*m/rad\n\n', Krb_dynamic_kN);
+
+    disp('--- Rigorous Impedances (NIST/Gazetas) ---');
+    fprintf('Kx_rigorous          = %.3e kN/m\n', Kx_nist_kN);
+    fprintf('Kyy_rigorous         = %.3e kN*m/rad\n\n', Kyy_nist_kN);
 
     disp('--- SSI Results (ASCE 7-10 / EC8 & FEMA 440) ---');
     fprintf('T_ratio_SSI          = %.4f\n', ratio_T_nist);
