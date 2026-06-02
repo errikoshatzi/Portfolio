@@ -1,0 +1,202 @@
+function Thesis_Code_Final()
+    clear; clc; close all;
+
+    if ~exist('output', 'dir')
+        mkdir('output');
+    end
+
+    disp('============================================================');
+    disp(' SSI VERIFICATION: ANALYTICAL THEORY vs CODES vs SAP2000 ');
+    disp('============================================================');
+
+    %% 1. INPUTS
+    E = ask_user('Column Elastic Modulus E (Pa)', 30e9);
+    a_col = ask_user('Square column side length a (m)', 1.0);
+    h = ask_user('Effective height h (m)', 3.0);
+    T_target = ask_user('Fixed-base target period T_fixed (s)', 0.10);
+    
+    F_tn = ask_user('Lateral Design Force F (tn)', 45);
+    F_N = F_tn * 9810;  % Convert to Newtons
+
+    disp('--- Structural Non-Linearity ---');
+    mu = ask_user('Ductility Factor mu (FEMA 440) [1.0 for Elastic]', 1.0);
+
+    disp('--- Soil & Foundation Properties ---');
+    G = ask_user('Soil Shear Modulus G (Pa)', 55e6);
+    nu = ask_user('Soil Poisson ratio nu', 0.325);
+    rho_s = ask_user('Soil Density rho_s (kg/m^3)', 1900);
+    
+    B = ask_user('Footing Width B (m)', 4.0);
+    L = ask_user('Footing Length L (m)', 4.5);
+    D_emb = ask_user('Embedment Depth Df (m)', 0.6);
+    
+    disp('--- SAP2000 Modal Results ---');
+    T_sap = ask_user('Period from SAP2000 (s)', 0.145);
+
+    %% 2. CALCULATIONS 
+    if B > L
+        temp = B; B = L; L = temp;
+    end
+
+    % Soil & Structural Properties
+    Vs = sqrt(G/rho_s);
+    I = (a_col^4) / 12; 
+    
+    k_struct_N = 3 * E * I / h^3;
+    k_struct_kN = k_struct_N / 1000;
+    
+    m = (T_target / (2*pi))^2 * k_struct_N;
+    T_fixed = 2*pi*sqrt(m/k_struct_N);
+    omega_fixed = 2*pi / T_fixed;
+    Delta_fixed = F_N / k_struct_N;
+
+    a0 = omega_fixed * (B/2) / Vs;
+
+    % NIST Impedances (Analytical Theory)
+    [K_dyn, beta_rad] = gazetas_impedance_full(B, L, D_emb, G, nu, Vs, omega_fixed);
+    Kx_nist_N = K_dyn.x;
+    Kyy_nist_N = K_dyn.ry;   
+    
+    Kx_nist_kN = Kx_nist_N / 1000;
+    Kyy_nist_kN = Kyy_nist_N / 1000;
+
+    % ASCE 7-10 / EC8 (Elastic Response)
+    ratio_T_nist = sqrt(1 + k_struct_N/Kx_nist_N + (k_struct_N*h^2)/Kyy_nist_N);
+    T_asce = T_fixed * ratio_T_nist;
+    Delta_flex = F_N/k_struct_N + (F_N / Kx_nist_N) + ((F_N*h) / Kyy_nist_N)*h;
+    
+    % Damping Calculation
+    beta_i = 0.05;
+    beta_s = 0.05;
+    beta_f = beta_s + beta_rad.x; 
+    beta_asce = beta_f + beta_i / (ratio_T_nist^3);
+
+    % FEMA 440 (Inelastic Response)
+    T_fema = T_asce * sqrt(mu);
+    beta_hys = 0;
+    if mu > 1.0
+        beta_hys = (2.0 * (mu - 1.0)) / (pi * mu);
+    end
+    beta_fema = beta_asce + beta_hys;
+    
+    % Validation Error
+    error_pct = abs(T_sap - T_asce) / T_asce * 100;
+
+    %% 3. DETAILED OUTPUT (Command Window)
+    disp('============================================================');
+    disp(' INPUT DATA & INTERMEDIATE RESULTS ');
+    disp('============================================================');
+    
+    disp('--- Soil properties ---');
+    fprintf('Soil Type            = Sand (Assumed)\n');
+    fprintf('nu                   = %.4f\n', nu);
+    fprintf('rho                  = %.1f kg/m^3\n', rho_s);
+    fprintf('G                    = %.3f kPa\n', G/1000);
+    fprintf('Vs                   = %.3f m/s\n', Vs);
+    fprintf('a0                   = %.4f\n\n', a0);
+
+    disp('--- Structural properties ---');
+    fprintf('I                    = %e m^4\n', I);
+    fprintf('k_struct             = %e kN/m\n', k_struct_kN);
+    fprintf('m                    = %.6f kg\n', m);
+    fprintf('T_fixed              = %.4f s\n', T_fixed);
+    fprintf('omega_fixed          = %.4f rad/s\n', omega_fixed);
+    fprintf('Delta_fixed          = %e m\n\n', Delta_fixed);
+
+    disp('--- Foundation spring constants (NIST/Gazetas) ---');
+    fprintf('Kx_dynamic           = %.3f kN/m\n', Kx_nist_kN);
+    fprintf('Kyy_dynamic          = %.3f kN*m/rad\n\n', Kyy_nist_kN);
+
+    disp('--- SSI Results (ASCE 7-10 / EC8 & FEMA 440) ---');
+    fprintf('T_ratio_SSI          = %.4f\n', ratio_T_nist);
+    fprintf('T_elastic (ASCE)     = %.4f s\n', T_asce);
+    fprintf('T_inelastic (FEMA)   = %.4f s (for mu = %.1f)\n', T_fema, mu);
+    fprintf('Delta_top_elastic    = %e m\n', Delta_flex);
+    fprintf('System Damping (ASCE)= %.4f (%.2f%%)\n', beta_asce, beta_asce*100);
+    fprintf('System Damping (FEMA)= %.4f (%.2f%%)\n\n', beta_fema, beta_fema*100);
+
+    disp('--- SAP2000 Verification ---');
+    fprintf('T_sap_model          = %.4f s\n', T_sap);
+    fprintf('Deviation (Error)    = %.2f%%\n', error_pct);
+    disp('============================================================');
+
+    %% 4. GRAPH PLOTTING (Safe method for all Octave versions)
+    labels = {'Fixed Base', 'NIST / ASCE 7', sprintf('FEMA 440 (\\mu=%.1f)', mu), 'SAP2000'};
+    periods = [T_fixed, T_asce, T_fema, T_sap];
+
+    % Colors (RGB values)
+    colors = [
+        0.39 0.45 0.54;  % Gray for Fixed
+        0.31 0.27 0.90;  % Indigo for ASCE/NIST
+        0.96 0.62 0.04;  % Amber for FEMA
+        0.06 0.72 0.51   % Emerald for SAP
+    ];
+
+    fig1 = figure('Color','w', 'Position', [100, 100, 800, 500]);
+    hold on; % <--- This prevents the scalar error in Octave
+
+    for i = 1:4
+        bar(i, periods(i), 0.5, 'FaceColor', colors(i,:));
+        % Add text above bars
+        text(i, periods(i) + 0.005, sprintf('%.3f s', periods(i)), ...
+            'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
+            'FontWeight', 'bold', 'FontSize', 11);
+    end
+    
+    set(gca, 'XTick', 1:4, 'XTickLabel', labels, 'FontSize', 11, 'FontWeight', 'bold');
+    ylabel('Fundamental Period T (sec)', 'FontWeight', 'bold', 'FontSize', 12);
+    title('Validation of SSI: Codes vs FEM Software', 'FontSize', 14);
+    
+    grid on; box on;
+    hold off;
+    
+    print(fig1, fullfile('output','01_Code_Validation_Clean.png'), '-dpng', '-r300');
+    disp('Plot saved successfully to "output" folder.');
+end
+
+function val = ask_user(prompt_text, default_val)
+    str = sprintf('%s [%g]: ', prompt_text, default_val);
+    user_input = input(str);
+    if isempty(user_input)
+        val = default_val;
+    else
+        val = user_input;
+    end
+end
+
+function [K_dyn, beta_rad] = gazetas_impedance_full(B_total, L_total, D_emb, G, nu, Vs, omega)
+    b = B_total / 2; 
+    l = L_total / 2;
+    if l < b
+        temp = l; l = b; b = temp;
+    end
+    a0 = omega * b / Vs;
+    psi = min(sqrt(2*(1-nu)/max(1e-5,1-2*nu)), 2.5);
+
+    chi = (4*b*l) / (4*l^2);
+    Ibx = (2*l) * (2*b)^3 / 12; 
+    Iby = (2*b) * (2*l)^3 / 12; 
+
+    Ky_sur = (2*G*l / (2-nu)) * (2 + 2.5 * chi^0.85);
+    Kx_sur = Ky_sur - (0.2 / (0.75 - nu)) * G * l * (1 - b/l);
+    Kry_sur = (3*G / (1-nu)) * Iby^0.75 * (l/b)^0.15;
+
+    eta_y = 1.0 + (0.33 + 1.34/(1 + l/b)) * (D_emb/b)^0.8;
+    eta_x = eta_y; 
+    eta_ry = 1.0 + D_emb/b + 1.6 / (0.35 + (l/b)^4) * (D_emb/b)^2; 
+
+    Kx_emb = Kx_sur * eta_x;
+    Kry_emb = Kry_sur * eta_ry;
+
+    alpha_x = 1.0;
+    if nu < 0.45
+        alpha_ry = max(0.01, 1 - 0.30 * a0);
+    else
+        alpha_ry = max(0.01, 1 - 0.25 * a0 * (l/b)^0.30);
+    end
+
+    K_dyn.x  = Kx_emb * alpha_x;
+    K_dyn.ry = Kry_emb * alpha_ry;
+
+    beta_rad.x = (4 * (l/b + (D_emb/b)*(psi + l/b)) / (Kx_emb / (G*b))) * (a0 / 2.0);
+end
