@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Διαδραστικό Προσομοίωμα ΑΕΚ - Διπλωματική Εργασία</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 20px; line-height: 1.5; }
+        .dashboard { max-width: 1200px; margin: 0 auto; }
+        
+        .header { text-align: center; margin-bottom: 30px; padding: 20px; background: #1e3a8a; color: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header h1 { margin: 0 0 10px 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+        .header p { margin: 0; font-size: 15px; color: #bfdbfe; }
+        
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 25px; }
+        
+        .card { background: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+        .card h3 { margin-top: 0; font-size: 15px; color: #1e293b; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .input-group { margin-bottom: 12px; }
+        .input-group label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+        .input-group input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 14px; box-sizing: border-box; transition: border-color 0.2s; }
+        .input-group input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        .input-group .helper { font-size: 11px; color: #64748b; margin-top: 4px; display: block; }
+        
+        .highlight-sap { border: 2px solid #10b981 !important; background-color: #f0fdf4; font-weight: bold; color: #047857;}
+        .highlight-mu { border: 2px solid #f59e0b !important; background-color: #fffbeb; font-weight: bold; color: #b45309;}
+        
+        .results-section { background: #ffffff; border-radius: 12px; padding: 25px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; margin-bottom: 25px;}
+        
+        /* Bar Chart Styles */
+        .bar-wrap { margin-bottom: 16px; }
+        .bar-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #334155; }
+        .bar-track { width: 100%; background: #f1f5f9; border-radius: 6px; height: 26px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+        .bar-fill { height: 100%; display: flex; align-items: center; padding-left: 12px; color: white; font-weight: 700; font-size: 12px; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap;}
+        
+        .c-fixed { background-color: #64748b; }
+        .c-asce { background-color: #3b82f6; }
+        .c-fema { background-color: #f59e0b; }
+        .c-sap { background-color: #10b981; }
+        
+        /* Metrics Grid */
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 25px; margin-bottom: 20px;}
+        .metric-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center;}
+        .metric-box.aux { border-color: #e0e7ff; background: #eef2ff; }
+        .metric-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; line-height: 1.3;}
+        .metric-value { font-size: 16px; font-weight: 700; color: #0f172a; font-family: monospace; }
+        
+        /* Conclusion Box */
+        .theory-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px 20px; border-radius: 0 8px 8px 0; font-size: 14px; line-height: 1.6; color: #1e3a8a; margin-top: 20px; }
+        .theory-box.info { background: #f8fafc; border-left-color: #94a3b8; color: #475569; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="header">
+        <h1>Αξιολόγηση ΑΕΚ: Θεωρία, Κανονισμοί & SAP2000</h1>
+        <p>Διαδραστικός υπολογισμός Ελαστικού Ημιχώρου (NIST), ASCE 7-10, και FEMA 440</p>
+    </div>
+    
+    <div class="grid-container">
+        <div class="card">
+            <h3>1. Δομικα Δεδομενα</h3>
+            <div class="input-group">
+                <label>Μέτρο Ελαστικότητας E (Pa)</label>
+                <input type="number" id="paramE" value="30000000000" oninput="calculate()">
+            </div>
+            <div class="input-group">
+                <label>Πλευρά Στύλου a (m) / Ύψος h (m)</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="number" id="paramDcol" value="1.0" step="0.1" oninput="calculate()">
+                    <input type="number" id="paramH" value="3.0" step="0.1" oninput="calculate()">
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Στόχος Ιδιοπεριόδου Πακτωμένου T_fixed (s)</label>
+                <input type="number" id="paramTfixed" value="0.10" step="0.01" oninput="calculate()">
+                <span class="helper">Ορίζει την απαιτούμενη Ισοδύναμη Μάζα του συστήματος.</span>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>2. Ιδιοτητες Εδαφους & Πεδιλου</h3>
+            <div class="input-group">
+                <label>Μέτρο Διάτμησης G (Pa) / Λόγος ν</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="number" id="paramG" value="55000000" step="1000000" oninput="calculate()">
+                    <input type="number" id="paramNu" value="0.325" step="0.01" oninput="calculate()">
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Πλάτος B (m) / Μήκος L (m) / Βάθος Df (m)</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="number" id="paramB" value="4.0" step="0.1" oninput="calculate()">
+                    <input type="number" id="paramL" value="4.5" step="0.1" oninput="calculate()">
+                    <input type="number" id="paramDf" value="0.6" step="0.1" oninput="calculate()">
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Δείκτης Εδάφους Ks (MN/m³)</label>
+                <input type="number" id="paramKs" value="70" step="1" oninput="calculate()">
+                <span class="helper">Χρησιμοποιείται μόνο για τον υπολογισμό των βοηθητικών ελατηρίων.</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>3. Ανελαστικοτητα & Προσομοιωμα</h3>
+            <div class="input-group">
+                <label>Δείκτης Πλαστιμότητας μ (FEMA 440)</label>
+                <input type="number" id="paramMu" class="highlight-mu" value="1.0" step="0.5" min="1.0" oninput="calculate()">
+                <span class="helper">Βάλε μ=1.0 για ελαστική συμπεριφορά ή μ>1.0 για διαρροή.</span>
+            </div>
+            <div class="input-group" style="margin-top: 20px;">
+                <label>Ιδιοπερίοδος Modal SAP2000 (s)</label>
+                <input type="number" id="paramSAP" class="highlight-sap" value="0.1706" step="0.0001" oninput="calculate()">
+                <span class="helper">Η περίοδος που εξήχθη από το 3D FEM μοντέλο.</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="results-section">
+        <h3 style="margin-top: 0; color: #1e293b; font-size: 18px; margin-bottom: 20px;">Συγκριτικό Διάγραμμα Ιδιοπεριόδου Συστήματος (sec)</h3>
+        
+        <div class="bar-wrap">
+            <div class="bar-info"><span style="color:#475569;">1. Ιδεατή Πάκτωση (Βάση Αναφοράς)</span><span id="txtFixed"></span></div>
+            <div class="bar-track"><div id="barFixed" class="bar-fill c-fixed"></div></div>
+        </div>
+        
+        <div class="bar-wrap">
+            <div class="bar-info"><span style="color:#2563eb;">2. Θεωρία NIST / ASCE 7-10 (Ελαστική ΑΕΚ)</span><span id="txtAsce"></span></div>
+            <div class="bar-track"><div id="barAsce" class="bar-fill c-asce"></div></div>
+        </div>
+
+        <div class="bar-wrap">
+            <div class="bar-info"><span style="color:#d97706;">3. Κανονισμός FEMA 440 (Ανελαστική ΑΕΚ)</span><span id="txtFema"></span></div>
+            <div class="bar-track"><div id="barFema" class="bar-fill c-fema"></div></div>
+        </div>
+        
+        <div class="bar-wrap">
+            <div class="bar-info"><span style="color:#059669;">4. Αριθμητική Επαλήθευση (SAP2000 Modal)</span><span id="txtSap"></span></div>
+            <div class="bar-track"><div id="barSap" class="bar-fill c-sap"></div></div>
+        </div>
+
+        <div class="theory-box" id="theoryText1"></div>
+
+        <h3 style="margin-top: 30px; color: #1e293b; font-size: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">Δυναμικές Σταθερές Ελατηρίων (kN/m & kN·m/rad)</h3>
+        <div class="metrics-grid">
+            <div class="metric-box">
+                <div class="metric-label" style="color:#3b82f6;">NIST (Αυστηρη) - Kx</div>
+                <div class="metric-value" id="valKxNist">-</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-label" style="color:#3b82f6;">NIST (Αυστηρη) - Kyy</div>
+                <div class="metric-value" id="valKyyNist">-</div>
+            </div>
+            <div class="metric-box aux">
+                <div class="metric-label">Εμπειρικο Ελατηριο - Kx</div>
+                <div class="metric-value" id="valKxEmp">-</div>
+            </div>
+            <div class="metric-box aux">
+                <div class="metric-label">Εμπειρικο Ελατηριο - Kz</div>
+                <div class="metric-value" id="valKzEmp">-</div>
+            </div>
+            <div class="metric-box aux">
+                <div class="metric-label">Εμπειρικο Ελατηριο - Krl</div>
+                <div class="metric-value" id="valKrlEmp">-</div>
+            </div>
+            <div class="metric-box aux">
+                <div class="metric-label">Εμπειρικο Ελατηριο - Krb</div>
+                <div class="metric-value" id="valKrbEmp">-</div>
+            </div>
+        </div>
+        
+        <div class="theory-box info">
+            <b>Σημείωση:</b> Στον παραπάνω πίνακα παρατίθενται συμπληρωματικά και οι δυναμικές σταθερές των εμπειρικών ελατηρίων (υπολογισμένες βάσει του δείκτη Ks) αποκλειστικά για λόγους σύγκρισης δυσκαμψιών. Η μέθοδος αυτή δεν χρησιμοποιείται στους υπολογισμούς ιδιοπεριόδου του διαγράμματος.
+        </div>
+    </div>
+</div>
+
+<script>
+function calculate() {
+    // 1. Get Inputs
+    let E = parseFloat(document.getElementById('paramE').value);
+    let a_col = parseFloat(document.getElementById('paramDcol').value);
+    let h = parseFloat(document.getElementById('paramH').value);
+    let T_fixed = parseFloat(document.getElementById('paramTfixed').value);
+    let mu = parseFloat(document.getElementById('paramMu').value) || 1.0;
+    
+    let G = parseFloat(document.getElementById('paramG').value);
+    let nu = parseFloat(document.getElementById('paramNu').value);
+    let rho = 1900;
+    let Ks_MN = parseFloat(document.getElementById('paramKs').value);
+    
+    let B = parseFloat(document.getElementById('paramB').value);
+    let L = parseFloat(document.getElementById('paramL').value);
+    let Df = parseFloat(document.getElementById('paramDf').value);
+    let T_sap = parseFloat(document.getElementById('paramSAP').value);
+    
+    if (B > L) { let temp = B; B = L; L = temp; }
+    
+    // 2. Structural Properties
+    let Vs = Math.sqrt(G / rho);
+    let I = Math.pow(a_col, 4) / 12.0;
+    let k_struct_N = (3 * E * I) / Math.pow(h, 3);
+    let k_struct_kN = k_struct_N / 1000;
+    
+    let omega_fixed = 2 * Math.PI / T_fixed;
+    let a0 = omega_fixed * (B / 2.0) / Vs;
+    
+    // 3. Auxiliary Empirical Springs
+    let Bp = 0.305;
+    let Ks_kN = Ks_MN * 1000;
+    let n_delta = Math.pow((B + Bp) / (2 * B), 2);
+    let n_sigmax = (1.0 / 3.0) * (2.0 + B / L);
+    let n_beta = 1.0 + 2.0 * (Df / B);
+    let Ks_tel_kN = n_delta * n_sigmax * n_beta * Ks_kN;
+    
+    let Kz_dyn_kN = Ks_tel_kN * B * L;
+    let Kx_dyn_kN = 0.30 * Kz_dyn_kN;
+    let Krb_stat_kN = (Ks_tel_kN * B * Math.pow(L, 3)) / 12.0;
+    let Krl_stat_kN = (Ks_tel_kN * L * Math.pow(B, 3)) / 12.0;
+    
+    let krl_dyn = Math.max(0.25, 1 - 0.15 * a0);
+    let krb_dyn = Math.max(0.25, 1 - 0.20 * a0);
+    
+    let Krl_dyn_kN = Krl_stat_kN * krl_dyn;
+    let Krb_dyn_kN = Krb_stat_kN * krb_dyn;
+
+    // 4. NIST Rigorous Impedances
+    let b = B / 2.0;
+    let l = L / 2.0;
+    
+    let chi = (4 * b * l) / (4 * l * l);
+    let Iby = (2 * b) * Math.pow(2 * l, 3) / 12.0;
+    
+    let Ky_sur = (2 * G * l / (2 - nu)) * (2 + 2.5 * Math.pow(chi, 0.85));
+    let Kx_sur = Ky_sur - (0.2 / (0.75 - nu)) * G * l * (1 - b / l);
+    let Kry_sur = (3 * G / (1 - nu)) * Math.pow(Iby, 0.75) * Math.pow(l / b, 0.15);
+
+    let eta_x = 1.0 + (0.33 + 1.34 / (1 + l / b)) * Math.pow(Df / b, 0.8);
+    let eta_ry = 1.0 + Df / b + 1.6 / (0.35 + Math.pow(l / b, 4)) * Math.pow(Df / b, 2);
+    let alpha_ry = Math.max(0.01, 1 - 0.30 * a0);
+
+    let Kx_nist_N = Kx_sur * eta_x;
+    let Kyy_nist_N = Kry_sur * eta_ry * alpha_ry;
+    
+    let Kx_nist_kN = Kx_nist_N / 1000;
+    let Kyy_nist_kN = Kyy_nist_N / 1000;
+    
+    // 5. ASCE 7-10 (Elastic)
+    let ratio_T_asce = Math.sqrt(1.0 + k_struct_kN/Kx_nist_kN + (k_struct_kN*Math.pow(h,2))/Kyy_nist_kN);
+    let T_asce = T_fixed * ratio_T_asce; 
+    
+    // 6. FEMA 440 (Inelastic)
+    let T_fema = T_asce * Math.sqrt(mu);
+    
+    // 7. Error Calculation
+    let sap_error = Math.abs((T_sap - T_asce) / T_asce) * 100;
+    
+    // UPDATE UI
+    let vals = [T_fixed, T_asce, T_fema, T_sap];
+    let maxScale = Math.max(...vals) * 1.15;
+    
+    let setBar = (id, val, textId) => {
+        let el = document.getElementById(id);
+        el.style.width = (val / maxScale * 100) + "%";
+        el.innerText = val.toFixed(4) + " s";
+        if(textId) document.getElementById(textId).innerText = val.toFixed(4) + " s";
+    };
+    
+    setBar('barFixed', T_fixed, 'txtFixed');
+    setBar('barAsce', T_asce, 'txtAsce');
+    setBar('barFema', T_fema, 'txtFema');
+    setBar('barSap', T_sap, 'txtSap');
+
+    // Update Springs
+    document.getElementById('valKxNist').innerText = Kx_nist_kN.toLocaleString('en-US', {maximumFractionDigits:0});
+    document.getElementById('valKyyNist').innerText = Kyy_nist_kN.toLocaleString('en-US', {maximumFractionDigits:0});
+    
+    document.getElementById('valKxEmp').innerText = Kx_dyn_kN.toLocaleString('en-US', {maximumFractionDigits:0});
+    document.getElementById('valKzEmp').innerText = Kz_dyn_kN.toLocaleString('en-US', {maximumFractionDigits:0});
+    document.getElementById('valKrlEmp').innerText = Krl_dyn_kN.toLocaleString('en-US', {maximumFractionDigits:0});
+    document.getElementById('valKrbEmp').innerText = Krb_dyn_kN.toLocaleString('en-US', {maximumFractionDigits:0});
+
+    // Dynamic Text
+    document.getElementById('theoryText1').innerHTML = `<b>Επαλήθευση SAP2000:</b> Η απόκλιση της αναλυτικής θεωρίας (${T_asce.toFixed(4)} s) από το FEM μοντέλο στο SAP2000 (${T_sap.toFixed(4)} s) είναι <b>${sap_error.toFixed(2)}%</b>. Η αναμενόμενη αυτή διαφορά οφείλεται κυρίως στην ακριβέστερη κατανομή της μάζας και την ενσωμάτωση διατμητικών παραμορφώσεων (Timoshenko) στο ψηφιακό προσομοίωμα.`;
+}
+
+// Initial Call
+window.onload = calculate;
+</script>
+</body>
+</html>
